@@ -1,0 +1,95 @@
+name: "Terraform Plan & Guardrail Validation"
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "terraform/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write      # Required for Workload Identity Federation
+  contents: read       # Required to checkout the repository
+  pull-requests: write # Required to post comments on Pull Requests
+
+jobs:
+  plan:
+    name: "Terraform Plan"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform
+
+    steps:
+      - name: "Checkout Source Code"
+        uses: actions/checkout@v4
+
+      - name: "Authenticate to Google Cloud (Keyless WIF)"
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/396356872723/locations/global/workloadIdentityPools/github-actions-pool-1021e058/providers/github-actions-provider"
+          service_account: "sa-terraform-cicd@vigilant-cider-502720-m5.iam.gserviceaccount.com"
+
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+
+      - name: "Terraform Format Check"
+        id: fmt
+        run: terraform fmt -check
+        continue-on-error: true
+
+      - name: "Terraform Init"
+        id: init
+        run: terraform init
+
+      - name: "Terraform Validate"
+        id: validate
+        run: terraform validate -no-color
+
+      - name: "Terraform Plan"
+        id: plan
+        run: |
+          terraform plan -no-color -out=tfplan
+          terraform show -no-color tfplan > plan_output.txt
+        continue-on-error: false
+
+      - name: "Post Plan Summary to Pull Request"
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const planText = fs.readFileSync('./terraform/plan_output.txt', 'utf8');
+            
+            // Limit output size for PR comment
+            const maxLen = 65000;
+            const truncatedPlan = planText.length > maxLen ? planText.substring(0, maxLen) + '\n...[Plan Truncated]' : planText;
+            
+            const output = `### 🛡️ Terraform GitOps Automated Review
+
+            #### Status Checks:
+            - 🖌 **Format and Style:** \`${{ steps.fmt.outcome }}\`
+            - ⚙️ **Initialization:** \`${{ steps.init.outcome }}\`
+            - 🤖 **Validation:** \`${{ steps.validate.outcome }}\`
+            - 📋 **Plan:** \`${{ steps.plan.outcome }}\`
+
+            <details><summary><b>🔍 View Full Terraform Plan</b></summary>
+
+            \`\`\`hcl
+            ${truncatedPlan}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }} | Action: \`${{ github.event_name }}\` | Governance: Stellar-Engine-Baseline*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });

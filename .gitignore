@@ -1,0 +1,17 @@
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+*.tfplan
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude all .tfvars files with sensitive content if needed (keep sample/default)
+*.tfvars.json
+
+# Ignore Mac OS files
+.DS_Store
