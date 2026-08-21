@@ -77,3 +77,23 @@ resource "google_storage_bucket_iam_member" "workload_bucket_access" {
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.workload_sa.email}"
 }
+
+# ------------------------------------------------------------------------------
+# 4. Enclave Security: Internal Traffic Ingress Rule (GitOps Change Example)
+# ------------------------------------------------------------------------------
+resource "google_compute_firewall" "allow_internal" {
+  name        = "fw-allow-internal-${google_compute_network.enclave_vpc.name}"
+  network     = google_compute_network.enclave_vpc.name
+  description = "Allow internal communication within the enclave subnet"
+
+  allow {
+    protocol = "icmp"
+  }
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443", "8080"]
+  }
+
+  source_ranges = ["10.10.1.0/24"]
+}
