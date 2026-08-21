@@ -43,7 +43,9 @@ jobs:
 
       - name: "Terraform Outputs Summary"
         run: |
-          echo "### 🚀 Infrastructure Successfully Deployed via GitOps" >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
-          terraform output >> $GITHUB_STEP_SUMMARY
-          echo "```" >> $GITHUB_STEP_SUMMARY
+          cat << 'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### 🚀 Infrastructure Successfully Deployed via GitOps
+          ```
+          EOF
+          terraform output >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
